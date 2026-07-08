@@ -94,7 +94,7 @@ test("createImageMcpServer registers the edit_image MCP tool", async () => {
   }
 });
 
-test("createImageMcpServer registers article_cover with required product image", async () => {
+test("createImageMcpServer registers article_cover with optional product image", async () => {
   const server = createImageMcpServer();
   const client = new Client({ name: "image-mcp-test-client", version: "1.0.0" });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
@@ -106,8 +106,8 @@ test("createImageMcpServer registers article_cover with required product image",
     const coverTool = tools.tools.find((tool) => tool.name === ARTICLE_COVER_TOOL_NAME);
 
     assert.ok(coverTool);
-    assert.equal(coverTool.description, "Create a 16:9 article cover from a required product image and built-in prompt.");
-    assert.deepEqual(coverTool.inputSchema.required, ["title", "product_image_path"]);
+    assert.equal(coverTool.description, "Create a 16:9 article cover using text-to-image or an optional uploaded product image.");
+    assert.deepEqual(coverTool.inputSchema.required, ["title"]);
   } finally {
     await Promise.all([client.close(), server.close()]);
   }

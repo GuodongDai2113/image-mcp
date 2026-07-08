@@ -129,10 +129,10 @@ export function createImageMcpServer(): McpServer {
     ARTICLE_COVER_TOOL_NAME,
     {
       title: "Article Cover",
-      description: "Create a 16:9 article cover from a required product image and built-in prompt.",
+      description: "Create a 16:9 article cover using text-to-image or an optional uploaded product image.",
       inputSchema: {
         title: z.string().min(1).describe("Article title used for the cover theme and saved filename."),
-        product_image_path: z.string().min(1).describe("Required local product image path to upload."),
+        product_image_path: z.string().min(1).optional().describe("Optional local product image path to upload. If provided, image-to-image generation is used."),
         summary: z.string().optional().describe("Article summary, audience, or background context."),
         response_format: z.enum(["url", "b64_json"]).optional().describe("Image response format. Defaults to url.")
       }
@@ -141,13 +141,19 @@ export function createImageMcpServer(): McpServer {
       try {
         const prompt = buildArticleCoverPrompt({
           title,
-          summary
+          summary,
+          usesProductImage: typeof product_image_path === "string" && product_image_path.trim().length > 0
         });
-        const result = await editImage({
-          prompt,
-          imagePath: product_image_path,
-          responseFormat: response_format as ResponseFormat | undefined
-        });
+        const result = typeof product_image_path === "string" && product_image_path.trim().length > 0
+          ? await editImage({
+              prompt,
+              imagePath: product_image_path,
+              responseFormat: response_format as ResponseFormat | undefined
+            })
+          : await generateImage({
+              prompt,
+              responseFormat: response_format as ResponseFormat | undefined
+            });
         const savedResult = await saveGeneratedImage({
           prompt: title,
           result

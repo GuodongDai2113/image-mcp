@@ -11,6 +11,11 @@ export interface ArticleCoverPromptOptions {
    * 文章摘要或受众背景，用于辅助封面风格和语义表达。
    */
   summary?: string;
+
+  /**
+   * 是否会随请求上传产品图片；为 true 时提示词会要求保留上传产品图主体。
+   */
+  usesProductImage: boolean;
 }
 
 /**
@@ -29,15 +34,18 @@ export interface ArticleIllustrationPromptOptions {
 }
 
 /**
- * 根据文章标题和摘要构建 16:9 文章封面提示词，要求使用上传产品图作为视觉主体。
+ * 根据文章标题、摘要和产品图状态构建 16:9 文章封面提示词。
  */
 export function buildArticleCoverPrompt(options: ArticleCoverPromptOptions): string {
   const summaryLine = options.summary?.trim()
     ? `Article summary or audience context: ${options.summary.trim()}`
     : "Article summary or audience context: not provided.";
+  const imageInstruction = options.usesProductImage
+    ? "Use the uploaded product image as the main visual subject, preserving product recognizability and key details."
+    : "Create the cover from text only, with a relevant product or application scenario implied by the article title.";
 
   return [
-    "Create a 16:9 article cover image. Use the uploaded product image as the main visual subject, preserving product recognizability and key details. Design for a technical blog, company article.Use the application scenario as background. ",
+    `Create a 16:9 article cover image. ${imageInstruction} Design for a technical blog or company article. Use the application scenario as background.`,
     `Article title: ${options.title.trim()}`,
     summaryLine
   ].join("\n");
