@@ -32,6 +32,30 @@ test("formatToolResult returns readable JSON text", () => {
   });
 });
 
+test("all MCP tool-facing descriptions are English", async () => {
+  const server = createImageMcpServer();
+  const client = new Client({ name: "image-mcp-test-client", version: "1.0.0" });
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+
+  await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+
+  try {
+    const tools = await client.listTools();
+
+    for (const tool of tools.tools) {
+      const toolFacingText = JSON.stringify({
+        title: tool.title,
+        description: tool.description,
+        inputSchema: tool.inputSchema
+      });
+
+      assert.doesNotMatch(toolFacingText, /\p{Script=Han}/u);
+    }
+  } finally {
+    await Promise.all([client.close(), server.close()]);
+  }
+});
+
 test("createImageMcpServer registers the generate_image MCP tool", async () => {
   const server = createImageMcpServer();
   const client = new Client({ name: "image-mcp-test-client", version: "1.0.0" });

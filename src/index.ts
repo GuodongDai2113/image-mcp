@@ -43,8 +43,8 @@ export function createImageMcpServer(): McpServer {
       title: "Generate Image",
       description: "Generate one image from a text prompt using APIYi gpt-image-2-all.",
       inputSchema: {
-        prompt: z.string().min(1).describe("图片生成提示词；尺寸、比例和风格也应写在提示词中。"),
-        response_format: z.enum(["url", "b64_json"]).optional().describe("图片响应格式，默认 url。")
+        prompt: z.string().min(1).describe("Image generation prompt. Include size, aspect ratio, and style requirements in the prompt."),
+        response_format: z.enum(["url", "b64_json"]).optional().describe("Image response format. Defaults to url.")
       }
     },
     async ({ prompt, response_format }) => {
@@ -86,9 +86,9 @@ export function createImageMcpServer(): McpServer {
       title: "Edit Image",
       description: "Upload one local image and generate a new image from a prompt using APIYi gpt-image-2-all.",
       inputSchema: {
-        prompt: z.string().min(1).describe("图片编辑提示词，描述希望如何基于上传图片生成新图片。"),
-        image_path: z.string().min(1).describe("需要上传给 APIYi 的本地图片路径。"),
-        response_format: z.enum(["url", "b64_json"]).optional().describe("图片响应格式，默认 url。")
+        prompt: z.string().min(1).describe("Image editing prompt describing how to generate a new image from the uploaded image."),
+        image_path: z.string().min(1).describe("Local image path to upload to APIYi."),
+        response_format: z.enum(["url", "b64_json"]).optional().describe("Image response format. Defaults to url.")
       }
     },
     async ({ prompt, image_path, response_format }) => {
@@ -131,10 +131,10 @@ export function createImageMcpServer(): McpServer {
       title: "Article Cover",
       description: "Create a 16:9 article cover from a required product image and built-in prompt.",
       inputSchema: {
-        title: z.string().min(1).describe("文章标题，用于生成封面主题和保存文件名。"),
-        product_image_path: z.string().min(1).describe("必须上传的产品图片本地路径。"),
-        summary: z.string().optional().describe("文章摘要、受众或背景信息。"),
-        response_format: z.enum(["url", "b64_json"]).optional().describe("图片响应格式，默认 url。")
+        title: z.string().min(1).describe("Article title used for the cover theme and saved filename."),
+        product_image_path: z.string().min(1).describe("Required local product image path to upload."),
+        summary: z.string().optional().describe("Article summary, audience, or background context."),
+        response_format: z.enum(["url", "b64_json"]).optional().describe("Image response format. Defaults to url.")
       }
     },
     async ({ title, product_image_path, summary, response_format }) => {
@@ -181,9 +181,9 @@ export function createImageMcpServer(): McpServer {
       title: "Article Illustration",
       description: "Create a 16:9 in-article illustration using text-to-image and a built-in prompt.",
       inputSchema: {
-        topic: z.string().min(1).describe("文章配图主题，用于生成图片内容和保存文件名。"),
-        section_context: z.string().optional().describe("文章小节上下文，用于让配图贴合正文段落。"),
-        response_format: z.enum(["url", "b64_json"]).optional().describe("图片响应格式，默认 url。")
+        topic: z.string().min(1).describe("Article illustration topic used for image content and the saved filename."),
+        section_context: z.string().optional().describe("Article section context used to align the illustration with the body text."),
+        response_format: z.enum(["url", "b64_json"]).optional().describe("Image response format. Defaults to url.")
       }
     },
     async ({ topic, section_context, response_format }) => {
