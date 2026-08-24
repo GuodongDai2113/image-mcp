@@ -38,6 +38,11 @@ export interface ArticleIllustrationPromptOptions {
   sectionContext?: string;
 
   /**
+   * 是否会随请求上传产品图片；为 true 时提示词会要求将产品作为插图主体。
+   */
+  usesProductImage: boolean;
+
+  /**
    * 是否会随请求上传 Logo 图片；为 true 时提示词会要求将其作为克制的品牌署名。
    */
   usesLogoImage: boolean;
@@ -66,20 +71,24 @@ export function buildArticleCoverPrompt(options: ArticleCoverPromptOptions): str
 }
 
 /**
- * 根据 Git 中的原始规则构建 16:9 文章内配图提示词，并在上传 Logo 时追加品牌要求。
+ * 根据 Git 中的原始规则构建 16:9 文章内配图提示词，并按需追加产品图和 Logo 要求。
  */
 export function buildArticleIllustrationPrompt(options: ArticleIllustrationPromptOptions): string {
   const contextLine = options.sectionContext?.trim()
     ? `Section context: ${options.sectionContext.trim()}`
     : "Section context: not provided.";
+  const productInstruction = options.usesProductImage
+    ? "Image 1 is the uploaded product image. Use the product as the main visual subject of the illustration, preserving product recognizability and key details."
+    : undefined;
   const logoInstruction = options.usesLogoImage
-    ? "Image 1 is the uploaded Logo. Add the Logo to the illustration while preserving its original appearance, proportions, and colors. Use the Logo's dominant color as the illustration's primary color palette."
+    ? `Image ${options.usesProductImage ? 2 : 1} is the uploaded Logo. Add the Logo to the illustration while preserving its original appearance, proportions, and colors. Use the Logo's dominant color as the illustration's primary color palette.`
     : undefined;
 
   return [
     "Create a 16:9 illustration. ",
     `Illustration topic: ${options.topic.trim()}`,
     contextLine,
+    ...(productInstruction === undefined ? [] : [productInstruction]),
     ...(logoInstruction === undefined ? [] : [logoInstruction])
   ].join("\n");
 }

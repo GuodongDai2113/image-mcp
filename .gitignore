@@ -3,5 +3,4 @@ build/
 data/
 .env
 .auth/
-package-lock.json
 .codex

@@ -129,10 +129,10 @@ export function createImageMcpServer(): McpServer {
     ARTICLE_COVER_TOOL_NAME,
     {
       title: "Article Cover",
-      description: "Create a branded 16:9 article cover from a required product image and an optional logo image.",
+      description: "Create a 16:9 article cover with optional product and logo images.",
       inputSchema: {
         title: z.string().min(1).describe("Article title used for the cover theme and saved filename."),
-        product_image_path: z.string().trim().min(1).describe("Required local product image path. The product is preserved as the main visual subject."),
+        product_image_path: z.string().trim().min(1).optional().describe("Optional local product image path. The product is preserved as the main visual subject when provided."),
         logo_image_path: z.string().trim().min(1).optional().describe("Optional local logo image path. The logo is preserved and placed as a subtle brand mark."),
         summary: z.string().optional().describe("Article summary, audience, or background context."),
         response_format: z.enum(["url", "b64_json"]).optional().describe("Image response format. Defaults to url.")
@@ -140,17 +140,18 @@ export function createImageMcpServer(): McpServer {
     },
     async ({ title, product_image_path, logo_image_path, summary, response_format }) => {
       try {
+        const usesProductImage = product_image_path !== undefined;
         const usesLogoImage = logo_image_path !== undefined;
         const prompt = buildArticleCoverPrompt({
           title,
           summary,
-          usesProductImage: true,
+          usesProductImage,
           usesLogoImage
         });
-        const result = await editImage({
+        const result = await generateArticleImage({
           prompt,
-          imagePath: product_image_path,
-          additionalImagePaths: logo_image_path === undefined ? undefined : [logo_image_path],
+          productImagePath: product_image_path,
+          logoImagePath: logo_image_path,
           responseFormat: response_format as ResponseFormat | undefined
         });
         const savedResult = await saveGeneratedImage({
@@ -184,32 +185,31 @@ export function createImageMcpServer(): McpServer {
     ARTICLE_ILLUSTRATION_TOOL_NAME,
     {
       title: "Article Illustration",
-      description: "Create a 16:9 in-article illustration with an optional logo image.",
+      description: "Create a 16:9 in-article illustration with optional product and logo images.",
       inputSchema: {
         topic: z.string().min(1).describe("Article illustration topic used for image content and the saved filename."),
         section_context: z.string().optional().describe("Article section context used to align the illustration with the body text."),
+        product_image_path: z.string().trim().min(1).optional().describe("Optional local product image path. The product is preserved as the main visual subject when provided."),
         logo_image_path: z.string().trim().min(1).optional().describe("Optional local logo image path. The logo is preserved and placed as a subtle brand mark."),
         response_format: z.enum(["url", "b64_json"]).optional().describe("Image response format. Defaults to url.")
       }
     },
-    async ({ topic, section_context, logo_image_path, response_format }) => {
+    async ({ topic, section_context, product_image_path, logo_image_path, response_format }) => {
       try {
+        const usesProductImage = product_image_path !== undefined;
         const usesLogoImage = logo_image_path !== undefined;
         const prompt = buildArticleIllustrationPrompt({
           topic,
           sectionContext: section_context,
+          usesProductImage,
           usesLogoImage
         });
-        const result = logo_image_path !== undefined
-          ? await editImage({
-              prompt,
-              imagePath: logo_image_path,
-              responseFormat: response_format as ResponseFormat | undefined
-            })
-          : await generateImage({
-              prompt,
-              responseFormat: response_format as ResponseFormat | undefined
-            });
+        const result = await generateArticleImage({
+          prompt,
+          productImagePath: product_image_path,
+          logoImagePath: logo_image_path,
+          responseFormat: response_format as ResponseFormat | undefined
+        });
         const savedResult = await saveGeneratedImage({
           prompt: topic,
           result
@@ -245,6 +245,55 @@ export function createImageMcpServer(): McpServer {
  */
 export function formatToolResult(result: GenerateImageResult): string {
   return JSON.stringify(result, null, 2);
+}
+
+/**
+ * 使用固定文章提示词和可选参考图生成图片；无参考图时调用文生图，有参考图时按产品图、Logo 的顺序调用图片编辑。
+ */
+async function generateArticleImage(options: {
+  /**
+   * 已由文章工具构建完成的固定提示词。
+   */
+  prompt: string;
+
+  /**
+   * 可选产品图片路径；存在时始终作为第一张参考图。
+   */
+  productImagePath?: string;
+
+  /**
+   * 可选 Logo 图片路径；存在产品图时作为第二张参考图，否则作为第一张参考图。
+   */
+  logoImagePath?: string;
+
+  /**
+   * APIYi 返回图片时使用的响应格式。
+   */
+  responseFormat?: ResponseFormat;
+}): Promise<GenerateImageResult> {
+  const imagePaths: string[] = [];
+
+  if (options.productImagePath !== undefined) {
+    imagePaths.push(options.productImagePath);
+  }
+
+  if (options.logoImagePath !== undefined) {
+    imagePaths.push(options.logoImagePath);
+  }
+
+  if (imagePaths.length === 0) {
+    return generateImage({
+      prompt: options.prompt,
+      responseFormat: options.responseFormat
+    });
+  }
+
+  return editImage({
+    prompt: options.prompt,
+    imagePath: imagePaths[0],
+    additionalImagePaths: imagePaths.length > 1 ? imagePaths.slice(1) : undefined,
+    responseFormat: options.responseFormat
+  });
 }
 
 /**

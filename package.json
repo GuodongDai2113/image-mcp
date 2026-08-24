@@ -1,16 +1,53 @@
 {
-  "name": "image-mcp",
+  "name": "@guodongdai2113/image-mcp",
   "version": "1.0.0",
-  "private": true,
+  "description": "MCP server for APIYi image generation, image editing, and article artwork.",
   "type": "module",
+  "license": "MIT",
+  "author": "Guodong Dai",
+  "homepage": "https://github.com/GuodongDai2113/image-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/GuodongDai2113/image-mcp/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GuodongDai2113/image-mcp.git"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "image-generation",
+    "image-editing",
+    "apiyi",
+    "gpt-image"
+  ],
+  "engines": {
+    "node": ">=18.14.1"
+  },
+  "files": [
+    "build/apiyi.js",
+    "build/articlePrompts.js",
+    "build/imageFile.js",
+    "build/index.js",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
   "bin": {
     "image-mcp": "build/index.js"
   },
   "scripts": {
     "clean": "node -e \"fs.rmSync('build',{recursive:true,force:true})\"",
     "build": "npm run clean && tsc -p tsconfig.json",
+    "audit:prod": "npm audit --omit=dev --registry=https://registry.npmjs.org/",
+    "check": "npm test && npm run audit:prod && npm run pack:check",
     "test": "npm run build && node --test build/*.test.js",
-    "test:unit": "node --test build/*.test.js"
+    "test:unit": "node --test build/*.test.js",
+    "pack:check": "npm pack --dry-run",
+    "prepublishOnly": "npm test"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

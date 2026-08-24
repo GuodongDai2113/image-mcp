@@ -50,6 +50,7 @@ test("buildArticleIllustrationPrompt preserves the original Git prompt when no l
   const prompt = buildArticleIllustrationPrompt({
     topic: "Step-by-step installation workflow for insulation piercing connectors",
     sectionContext: "Explain safe clamp alignment before tightening.",
+    usesProductImage: false,
     usesLogoImage: false
   });
 
@@ -63,6 +64,7 @@ test("buildArticleIllustrationPrompt preserves the original Git prompt when no l
 test("buildArticleIllustrationPrompt preserves an optional logo reference", () => {
   const prompt = buildArticleIllustrationPrompt({
     topic: "Smart grid monitoring workflow",
+    usesProductImage: false,
     usesLogoImage: true
   });
 
@@ -70,4 +72,16 @@ test("buildArticleIllustrationPrompt preserves an optional logo reference", () =
   assert.match(prompt, /preserving its original appearance, proportions, and colors/i);
   assert.match(prompt, /Logo's dominant color/i);
   assert.match(prompt, /illustration's primary color palette/i);
+});
+
+test("buildArticleIllustrationPrompt identifies optional product and logo references in upload order", () => {
+  const prompt = buildArticleIllustrationPrompt({
+    topic: "Suspension clamp installation workflow",
+    usesProductImage: true,
+    usesLogoImage: true
+  });
+
+  assert.match(prompt, /Image 1 is the uploaded product image/i);
+  assert.match(prompt, /main visual subject of the illustration/i);
+  assert.match(prompt, /Image 2 is the uploaded Logo/i);
 });
