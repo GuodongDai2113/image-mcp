@@ -129,31 +129,30 @@ export function createImageMcpServer(): McpServer {
     ARTICLE_COVER_TOOL_NAME,
     {
       title: "Article Cover",
-      description: "Create a 16:9 article cover using text-to-image or an optional uploaded product image.",
+      description: "Create a branded 16:9 article cover from a required product image and an optional logo image.",
       inputSchema: {
         title: z.string().min(1).describe("Article title used for the cover theme and saved filename."),
-        product_image_path: z.string().min(1).optional().describe("Optional local product image path to upload. If provided, image-to-image generation is used."),
+        product_image_path: z.string().trim().min(1).describe("Required local product image path. The product is preserved as the main visual subject."),
+        logo_image_path: z.string().trim().min(1).optional().describe("Optional local logo image path. The logo is preserved and placed as a subtle brand mark."),
         summary: z.string().optional().describe("Article summary, audience, or background context."),
         response_format: z.enum(["url", "b64_json"]).optional().describe("Image response format. Defaults to url.")
       }
     },
-    async ({ title, product_image_path, summary, response_format }) => {
+    async ({ title, product_image_path, logo_image_path, summary, response_format }) => {
       try {
+        const usesLogoImage = logo_image_path !== undefined;
         const prompt = buildArticleCoverPrompt({
           title,
           summary,
-          usesProductImage: typeof product_image_path === "string" && product_image_path.trim().length > 0
+          usesProductImage: true,
+          usesLogoImage
         });
-        const result = typeof product_image_path === "string" && product_image_path.trim().length > 0
-          ? await editImage({
-              prompt,
-              imagePath: product_image_path,
-              responseFormat: response_format as ResponseFormat | undefined
-            })
-          : await generateImage({
-              prompt,
-              responseFormat: response_format as ResponseFormat | undefined
-            });
+        const result = await editImage({
+          prompt,
+          imagePath: product_image_path,
+          additionalImagePaths: logo_image_path === undefined ? undefined : [logo_image_path],
+          responseFormat: response_format as ResponseFormat | undefined
+        });
         const savedResult = await saveGeneratedImage({
           prompt: title,
           result
@@ -185,23 +184,32 @@ export function createImageMcpServer(): McpServer {
     ARTICLE_ILLUSTRATION_TOOL_NAME,
     {
       title: "Article Illustration",
-      description: "Create a 16:9 in-article illustration using text-to-image and a built-in prompt.",
+      description: "Create a 16:9 in-article illustration with an optional logo image.",
       inputSchema: {
         topic: z.string().min(1).describe("Article illustration topic used for image content and the saved filename."),
         section_context: z.string().optional().describe("Article section context used to align the illustration with the body text."),
+        logo_image_path: z.string().trim().min(1).optional().describe("Optional local logo image path. The logo is preserved and placed as a subtle brand mark."),
         response_format: z.enum(["url", "b64_json"]).optional().describe("Image response format. Defaults to url.")
       }
     },
-    async ({ topic, section_context, response_format }) => {
+    async ({ topic, section_context, logo_image_path, response_format }) => {
       try {
+        const usesLogoImage = logo_image_path !== undefined;
         const prompt = buildArticleIllustrationPrompt({
           topic,
-          sectionContext: section_context
+          sectionContext: section_context,
+          usesLogoImage
         });
-        const result = await generateImage({
-          prompt,
-          responseFormat: response_format as ResponseFormat | undefined
-        });
+        const result = logo_image_path !== undefined
+          ? await editImage({
+              prompt,
+              imagePath: logo_image_path,
+              responseFormat: response_format as ResponseFormat | undefined
+            })
+          : await generateImage({
+              prompt,
+              responseFormat: response_format as ResponseFormat | undefined
+            });
         const savedResult = await saveGeneratedImage({
           prompt: topic,
           result

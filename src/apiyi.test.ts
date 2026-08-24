@@ -176,6 +176,42 @@ test("editImage supports b64_json responses", async () => {
   }
 });
 
+test("editImage uploads additional reference images in prompt order", async () => {
+  const tempDir = await mkdtemp(path.join(tmpdir(), "image-mcp-edit-"));
+  const productImagePath = path.join(tempDir, "product.png");
+  const logoImagePath = path.join(tempDir, "logo.webp");
+  await writeFile(productImagePath, Buffer.from([1, 2, 3]));
+  await writeFile(logoImagePath, Buffer.from([4, 5, 6]));
+  let requestBody: FormData | undefined;
+
+  // 记录多图编辑请求，验证产品图与 Logo 会按提示词引用顺序上传。
+  const fakeFetch: typeof fetch = async (_input, init) => {
+    requestBody = init?.body as FormData;
+
+    return new Response(JSON.stringify({ data: [{ url: "https://r2.example/cover.png" }] }), { status: 200 });
+  };
+
+  try {
+    await editImage({
+      prompt: "Use image 1 as the product and image 2 as the logo.",
+      imagePath: productImagePath,
+      additionalImagePaths: [logoImagePath],
+      apiKey: "sk-test",
+      fetchImpl: fakeFetch
+    });
+
+    const images = requestBody?.getAll("image") as File[] | undefined;
+
+    assert.ok(images);
+    assert.deepEqual(images.map((image) => image.name), ["product.png", "logo.webp"]);
+    assert.deepEqual(images.map((image) => image.type), ["image/png", "image/webp"]);
+    assert.deepEqual(Buffer.from(await images[0].arrayBuffer()), Buffer.from([1, 2, 3]));
+    assert.deepEqual(Buffer.from(await images[1].arrayBuffer()), Buffer.from([4, 5, 6]));
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("editImage reports missing image file path", async () => {
   await assert.rejects(
     () =>

@@ -50,6 +50,11 @@ export interface EditImageOptions {
   imagePath: string;
 
   /**
+   * 需要按顺序追加上传的本地参考图片路径；模型可在提示词中按 image2、image3 依次引用。
+   */
+  additionalImagePaths?: readonly string[];
+
+  /**
    * 图片响应格式；默认使用 url，避免 MCP 返回体过大。
    */
   responseFormat?: ResponseFormat;
@@ -159,7 +164,8 @@ export async function editImage(options: EditImageOptions): Promise<GenerateImag
   const responseFormat = options.responseFormat ?? "url";
   const apiKey = resolveApiKey(options.apiKey);
   const fetchImpl = options.fetchImpl ?? fetch;
-  const formData = await createEditImageFormData(options.imagePath, options.prompt, responseFormat);
+  const imagePaths = [options.imagePath, ...(options.additionalImagePaths ?? [])];
+  const formData = await createEditImageFormData(imagePaths, options.prompt, responseFormat);
 
   const response = await fetchImpl(APIYI_IMAGE_EDIT_URL, {
     method: "POST",
@@ -179,21 +185,28 @@ export async function editImage(options: EditImageOptions): Promise<GenerateImag
 }
 
 /**
- * 创建 APIYi 图片编辑接口需要的 multipart/form-data 请求体。
+ * 创建 APIYi 图片编辑接口需要的 multipart/form-data 请求体，并按传入顺序追加参考图片。
  */
-async function createEditImageFormData(imagePath: string, prompt: string, responseFormat: ResponseFormat): Promise<FormData> {
-  const imageBuffer = await readImageFile(imagePath);
-  const filename = path.basename(imagePath);
-  const imageBytes = new Uint8Array(imageBuffer);
-  const imageBlob = new Blob([imageBytes], {
-    type: getMimeTypeFromPath(imagePath)
-  });
+async function createEditImageFormData(
+  imagePaths: readonly string[],
+  prompt: string,
+  responseFormat: ResponseFormat
+): Promise<FormData> {
   const formData = new FormData();
 
   formData.append("model", APIYI_IMAGE_MODEL);
   formData.append("prompt", prompt);
   formData.append("response_format", responseFormat);
-  formData.append("image", imageBlob, filename);
+
+  for (const imagePath of imagePaths) {
+    const imageBuffer = await readImageFile(imagePath);
+    const imageBytes = new Uint8Array(imageBuffer);
+    const imageBlob = new Blob([imageBytes], {
+      type: getMimeTypeFromPath(imagePath)
+    });
+
+    formData.append("image", imageBlob, path.basename(imagePath));
+  }
 
   return formData;
 }

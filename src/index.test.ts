@@ -94,7 +94,7 @@ test("createImageMcpServer registers the edit_image MCP tool", async () => {
   }
 });
 
-test("createImageMcpServer registers article_cover with optional product image", async () => {
+test("createImageMcpServer registers article_cover with required product image and optional logo", async () => {
   const server = createImageMcpServer();
   const client = new Client({ name: "image-mcp-test-client", version: "1.0.0" });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
@@ -106,14 +106,15 @@ test("createImageMcpServer registers article_cover with optional product image",
     const coverTool = tools.tools.find((tool) => tool.name === ARTICLE_COVER_TOOL_NAME);
 
     assert.ok(coverTool);
-    assert.equal(coverTool.description, "Create a 16:9 article cover using text-to-image or an optional uploaded product image.");
-    assert.deepEqual(coverTool.inputSchema.required, ["title"]);
+    assert.equal(coverTool.description, "Create a branded 16:9 article cover from a required product image and an optional logo image.");
+    assert.deepEqual(coverTool.inputSchema.required, ["title", "product_image_path"]);
+    assert.ok(coverTool.inputSchema.properties?.logo_image_path);
   } finally {
     await Promise.all([client.close(), server.close()]);
   }
 });
 
-test("createImageMcpServer registers article_illustration as text-to-image", async () => {
+test("createImageMcpServer registers article_illustration with an optional logo", async () => {
   const server = createImageMcpServer();
   const client = new Client({ name: "image-mcp-test-client", version: "1.0.0" });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
@@ -125,8 +126,9 @@ test("createImageMcpServer registers article_illustration as text-to-image", asy
     const illustrationTool = tools.tools.find((tool) => tool.name === ARTICLE_ILLUSTRATION_TOOL_NAME);
 
     assert.ok(illustrationTool);
-    assert.equal(illustrationTool.description, "Create a 16:9 in-article illustration using text-to-image and a built-in prompt.");
+    assert.equal(illustrationTool.description, "Create a 16:9 in-article illustration with an optional logo image.");
     assert.deepEqual(illustrationTool.inputSchema.required, ["topic"]);
+    assert.ok(illustrationTool.inputSchema.properties?.logo_image_path);
   } finally {
     await Promise.all([client.close(), server.close()]);
   }
