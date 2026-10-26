@@ -7,6 +7,10 @@ import { z } from "zod";
 import { editImage, generateImage, type GenerateImageResult, type ResponseFormat } from "./apiyi.js";
 import { buildArticleCoverPrompt, buildArticleIllustrationPrompt } from "./articlePrompts.js";
 import { saveGeneratedImage } from "./imageFile.js";
+import { generateIcons } from "./icons.js";
+
+/** MCP 客户端调用批量网格图标生成与裁切能力时使用的工具名称。 */
+export const GENERATE_ICONS_TOOL_NAME = "generate_icons";
 
 /**
  * MCP 客户端调用文生图能力时使用的工具名称。
@@ -233,6 +237,33 @@ export function createImageMcpServer(): McpServer {
             }
           ]
         };
+      }
+    }
+  );
+
+  server.registerTool(
+    GENERATE_ICONS_TOOL_NAME,
+    {
+      title: "Generate Icons",
+      description: "Generate one icon grid and crop it into separate square PNG icons in input order. Returns local paths for the grid and each icon.",
+      inputSchema: {
+        /** 指定本次生成的图标总数。 */
+        count: z.number().int().min(1).max(36).describe("Number of icons, from 1 to 36. Must equal descriptions length."),
+        /** 按最终输出顺序提供每个图标的描述。 */
+        descriptions: z.array(z.string().trim().min(1)).min(1).max(36).describe("One description per icon, in output order."),
+        /** 为整组图标指定统一视觉风格。 */
+        style: z.string().trim().min(1).optional().describe("Shared visual style. Defaults to clean, minimal flat icons. A transparent PNG background is always requested."),
+        /** 选择原始网格图的接口响应格式。 */
+        response_format: z.enum(["url", "b64_json"]).optional().describe("API image response format. Defaults to url. Cropped icons are always PNG.")
+      }
+    },
+    /** 生成网格并裁切图标，将失败原因作为 MCP 工具错误返回。 */
+    async ({ count, descriptions, style, response_format }) => {
+      try {
+        const result = await generateIcons({ count, descriptions, style, responseFormat: response_format });
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+      } catch (error) {
+        return { isError: true, content: [{ type: "text", text: getErrorMessage(error) }] };
       }
     }
   );

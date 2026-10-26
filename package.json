@@ -22,12 +22,13 @@
     "gpt-image"
   ],
   "engines": {
-    "node": ">=18.14.1"
+    "node": ">=20.9.0"
   },
   "files": [
     "build/apiyi.js",
     "build/articlePrompts.js",
     "build/imageFile.js",
+    "build/icons.js",
     "build/index.js",
     "README.md",
     "LICENSE",
@@ -51,6 +52,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
+    "sharp": "^0.35.5",
     "zod": "^3.25.76"
   },
   "devDependencies": {

@@ -11,6 +11,25 @@ import {
   GENERATE_IMAGE_TOOL_NAME
 } from "./index.js";
 
+/** 验证批量图标工具已注册，且数量与描述不匹配时返回可读错误。 */
+test("registers generate_icons and rejects mismatched count", async () => {
+  const server = createImageMcpServer();
+  const client = new Client({ name: "icons-test", version: "1.0.0" });
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+  try {
+    const listed = await client.listTools();
+    const tool = listed.tools.find((item) => item.name === "generate_icons");
+    assert.ok(tool);
+    assert.deepEqual(tool.inputSchema.required, ["count", "descriptions"]);
+    const result = await client.callTool({ name: "generate_icons", arguments: { count: 2, descriptions: ["home"] } });
+    assert.equal(result.isError, true);
+    assert.match(JSON.stringify(result.content), /exactly count/);
+  } finally {
+    await Promise.all([client.close(), server.close()]);
+  }
+});
+
 test("exports the expected MCP tool name", () => {
   assert.equal(GENERATE_IMAGE_TOOL_NAME, "generate_image");
   assert.equal(EDIT_IMAGE_TOOL_NAME, "edit_image");
