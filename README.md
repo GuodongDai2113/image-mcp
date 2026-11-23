@@ -1,6 +1,6 @@
 # image-mcp
 
-基于 [Model Context Protocol（MCP）](https://modelcontextprotocol.io/) 的图片生成服务。项目通过 APIYi 的 `gpt-image-2-all` 模型提供文生图、参考图编辑、文章封面和文章内配图能力，并将生成结果自动保存到当前用户的 `Pictures` 目录。
+基于 [Model Context Protocol（MCP）](https://modelcontextprotocol.io/) 的图片生成服务。项目通过 APIYi 的 GPT-Image 2.6 系列提供文生图、参考图编辑、文章封面和文章内配图能力：文生图使用 `gpt-image-2.6-flare`，图片编辑使用 `gpt-image-2.6-sunburst`。生成结果优先保存到 Agent 当前工作目录的 `.agents/images` 文件夹；若 `.agents` 不存在，则保存到 `images` 文件夹。
 
 ## 功能
 
@@ -9,7 +9,7 @@
 - 生成 16:9 文章封面，可选产品图和 Logo
 - 生成 16:9 文章内配图，可选产品图和 Logo
 - 批量生成 icon 网格图，并自动裁切为独立的 1:1 PNG 图标
-- 支持 URL 和 Base64 两种 API 响应格式
+- 自动处理 GPT-Image 2.6 返回的 Base64 图片数据
 - 自动下载并保存图片，不覆盖已有的同名文件
 - 使用 stdio 与 OpenCode、Claude Desktop 等 MCP 客户端通信
 
@@ -127,14 +127,12 @@ export APIYI_API_KEY="你的 API Key"
 | 参数 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
 | `prompt` | string | 是 | 图片生成提示词；尺寸、比例和风格要求应一并写入提示词 |
-| `response_format` | `url` \| `b64_json` | 否 | API 响应格式，默认值为 `url` |
 
 调用示例：
 
 ```json
 {
-  "prompt": "生成一张 16:9 的未来城市夜景，蓝紫色霓虹灯，电影感构图",
-  "response_format": "url"
+  "prompt": "生成一张 16:9 的未来城市夜景，蓝紫色霓虹灯，电影感构图"
 }
 ```
 
@@ -146,7 +144,6 @@ export APIYI_API_KEY="你的 API Key"
 | --- | --- | --- | --- |
 | `prompt` | string | 是 | 描述需要如何基于参考图生成新图片 |
 | `image_path` | string | 是 | MCP 服务进程可访问的本地图片路径 |
-| `response_format` | `url` \| `b64_json` | 否 | API 响应格式，默认值为 `url` |
 
 调用示例：
 
@@ -167,7 +164,6 @@ export APIYI_API_KEY="你的 API Key"
 | `summary` | string | 否 | 文章摘要、目标读者或背景信息 |
 | `product_image_path` | string | 否 | 本地产品图片路径 |
 | `logo_image_path` | string | 否 | 本地 Logo 图片路径 |
-| `response_format` | `url` \| `b64_json` | 否 | API 响应格式，默认值为 `url` |
 
 调用示例：
 
@@ -190,7 +186,6 @@ export APIYI_API_KEY="你的 API Key"
 | `section_context` | string | 否 | 文章小节内容或上下文 |
 | `product_image_path` | string | 否 | 本地产品图片路径 |
 | `logo_image_path` | string | 否 | 本地 Logo 图片路径 |
-| `response_format` | `url` \| `b64_json` | 否 | API 响应格式，默认值为 `url` |
 
 调用示例：
 
@@ -210,7 +205,6 @@ export APIYI_API_KEY="你的 API Key"
 | `count` | integer | 是 | 图标数量，1–36，必须与描述条数一致 |
 | `descriptions` | string[] | 是 | 每个图标的非空描述，按输出顺序排列 |
 | `style` | string | 否 | 整组图标的统一风格，默认简洁扁平风格；始终要求透明背景 PNG |
-| `response_format` | `url` \| `b64_json` | 否 | 原始网格图的 API 响应格式，默认 `url` |
 
 ```json
 {
@@ -220,7 +214,7 @@ export APIYI_API_KEY="你的 API Key"
 }
 ```
 
-网格边长为 `ceil(sqrt(count))`，从左到右、从上到下排列，剩余格子留空且不导出。每批结果保存到 `Pictures/icons-<随机后缀>/`，包含 `grid` 原图和带序号的图标文件，避免批次互相覆盖。
+网格边长为 `ceil(sqrt(count))`，从左到右、从上到下排列，剩余格子留空且不导出。每批结果保存在默认图片目录的 `icons-<随机后缀>/` 中，包含 `grid` 原图和带序号的图标文件，避免批次互相覆盖。
 
 返回 JSON 包含 `count`、`rows`、`columns`、`gridPath`、`outputDir` 和 `icons`。每个图标包含 `index`（从 1 开始）、`description`、`savedPath`、`width`、`height`；图标尺寸根据原图和网格大小计算，不放大像素。返回本地文件路径，不提供图标托管 URL。
 
@@ -230,25 +224,22 @@ export APIYI_API_KEY="你的 API Key"
 
 ## 返回结果与图片保存
 
-每次工具调用成功后都会返回格式化的 JSON 文本。除 `generate_icons` 使用上述批量结果结构外，使用默认的 `url` 格式时，结果类似：
+每次工具调用成功后都会返回格式化的 JSON 文本。除 `generate_icons` 使用上述批量结果结构外，结果类似：
 
 ```json
 {
   "created": 1787539200,
   "usage": {},
-  "url": "https://example.com/generated-image.png",
-  "savedPath": "C:\\Users\\Administrator\\Pictures\\未来城市夜景.png"
+  "b64_json": "data:image/png;base64,...",
+  "savedPath": "S:\\mcps\\image-mcp\\.agents\\images\\未来城市夜景.png"
 }
 ```
 
-图片默认保存在：
-
-- Windows：`C:\\Users\\<用户名>\\Pictures`
-- Linux/macOS：`~/Pictures`
+如果 MCP Agent 进程当前工作目录下存在 `.agents` 文件夹，图片默认保存到其中的 `.agents/images`；如果 `.agents` 不存在，则保存到工作目录下的 `images`。目标 `images` 文件夹不存在时会自动创建。
 
 文件名来自提示词、文章标题或配图主题。名称中的非法字符会被移除，最长保留 80 个字符；如果同名文件已经存在，服务会自动添加 `-2`、`-3` 等后缀。
 
-> `b64_json` 仅表示 APIYi 返回图片数据的格式。MCP 服务仍会把图片解码并保存到本地，同时在结果中返回 `savedPath`。
+> GPT-Image 2.6 官转接口固定返回纯 Base64 数据，不接受 `response_format` 参数。MCP 服务会补齐 data URL 前缀、解码并保存到本地，同时在结果中返回 `savedPath`。
 
 ## 开发命令
 
@@ -303,7 +294,7 @@ npm publish
 
 ### 工具调用成功但图片没有保存
 
-检查 `Pictures` 目录是否可写。如果使用 URL 响应格式，还需要确保服务可以访问 API 返回的图片地址。
+检查 Agent 当前工作目录下的 `.agents/images`（存在 `.agents` 时）或 `images` 子目录是否可写，并确认 MCP 客户端启动服务时配置了预期的工作目录。
 
 ### 修改源码后没有生效
 
@@ -325,7 +316,7 @@ src/
 
 - 不要将 API Key 写入源码或提交到 Git。
 - 图片编辑工具会将指定的本地图片上传到 APIYi，请勿传入敏感图片。
-- API 返回的图片 URL 可能具有时效性，请以本地 `savedPath` 中保存的文件为准。
+- API 返回的 Base64 图片内容可能较大，请以本地 `savedPath` 中保存的文件为准。
 
 ## 许可证
 

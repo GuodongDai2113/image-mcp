@@ -1,6 +1,5 @@
 import { constants } from "node:fs";
-import { access, mkdir, writeFile } from "node:fs/promises";
-import os from "node:os";
+import { access, mkdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { GenerateImageResult } from "./apiyi.js";
 
@@ -11,7 +10,7 @@ const MAX_FILENAME_LENGTH = 80;
  */
 export interface SavedGeneratedImageResult extends GenerateImageResult {
   /**
-   * 图片在当前系统用户 Pictures 目录中的本地保存路径。
+   * 图片在项目默认图片目录或指定目录中的本地保存路径。
    */
   savedPath: string;
 }
@@ -31,7 +30,7 @@ export interface SaveGeneratedImageOptions {
   result: GenerateImageResult;
 
   /**
-   * 图片保存目录；默认使用当前系统用户的 Pictures 目录。
+   * 图片保存目录；默认优先使用项目中的 .agents/images，不存在 .agents 时使用 images。
    */
   picturesDir?: string;
 
@@ -47,10 +46,10 @@ export interface SaveGeneratedImageOptions {
 }
 
 /**
- * 将生成图片保存到当前系统用户的 Pictures 目录，并返回带 savedPath 的结果。
+ * 将生成图片保存到指定目录或项目默认图片目录，并返回带 savedPath 的结果。
  */
 export async function saveGeneratedImage(options: SaveGeneratedImageOptions): Promise<SavedGeneratedImageResult> {
-  const picturesDir = options.picturesDir ?? getDefaultPicturesDir();
+  const picturesDir = options.picturesDir ?? await resolveDefaultImageDir();
   const now = options.now ?? (() => new Date());
   const image = await readImageBytes(options.result, options.fetchImpl ?? fetch);
   const baseName = sanitizePromptForFilename(options.prompt) || createFallbackBaseName(now());
@@ -79,10 +78,16 @@ export function sanitizePromptForFilename(prompt: string): string {
 }
 
 /**
- * 获取当前系统用户的默认图片目录。
+ * 解析项目的默认图片保存目录；存在 .agents 文件夹时优先使用 .agents/images，否则使用 images。
  */
-function getDefaultPicturesDir(): string {
-  return path.join(os.homedir(), "Pictures");
+export async function resolveDefaultImageDir(projectDir = process.cwd()): Promise<string> {
+  const agentsDir = path.join(projectDir, ".agents");
+
+  if (await directoryExists(agentsDir)) {
+    return path.join(agentsDir, "images");
+  }
+
+  return path.join(projectDir, "images");
 }
 
 /**
@@ -199,6 +204,17 @@ async function pathExists(filePath: string): Promise<boolean> {
   try {
     await access(filePath, constants.F_OK);
     return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 判断指定路径是否为已经存在的文件夹。
+ */
+async function directoryExists(directoryPath: string): Promise<boolean> {
+  try {
+    return (await stat(directoryPath)).isDirectory();
   } catch {
     return false;
   }

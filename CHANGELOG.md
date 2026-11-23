@@ -2,6 +2,14 @@
 
 本项目的所有重要变更都记录在此文件中。版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## 未发布
+
+### 变更
+
+- 文生图模型升级为 `gpt-image-2.6-flare`，图片编辑模型升级为 `gpt-image-2.6-sunburst`。
+- 按 GPT-Image 2.6 官转接口规范移除 `response_format` 参数，并兼容其纯 Base64 图片响应。
+- 默认图片优先保存到 Agent 当前工作目录的 `.agents/images`，不存在 `.agents` 时保存到 `images`。
+
 ## [1.0.0] - 2026-08-24
 
 ### 新增

@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 import { editImage, generateImage } from "./apiyi.js";
 
-test("generateImage defaults to url and sends APIYi request fields", async () => {
+test("generateImage sends the GPT-Image 2.6 Flare request fields", async () => {
   const calls: Array<{ input: string | URL | Request; init?: RequestInit }> = [];
 
   // 模拟 APIYi 成功响应，并记录客户端发出的请求内容。
@@ -16,7 +16,7 @@ test("generateImage defaults to url and sends APIYi request fields", async () =>
       JSON.stringify({
         created: 1778037331,
         usage: { total_tokens: 2104 },
-        data: [{ url: "https://r2.example/image.png" }]
+        data: [{ b64_json: "AQID" }]
       }),
       { status: 200, headers: { "content-type": "application/json" } }
     );
@@ -36,30 +36,28 @@ test("generateImage defaults to url and sends APIYi request fields", async () =>
     "Content-Type": "application/json"
   });
   assert.deepEqual(JSON.parse(String(calls[0].init?.body)), {
-    model: "gpt-image-2-all",
-    prompt: "横版 16:9 电影画幅，黄昏时的海边老灯塔",
-    response_format: "url"
+    model: "gpt-image-2.6-flare",
+    prompt: "横版 16:9 电影画幅，黄昏时的海边老灯塔"
   });
   assert.deepEqual(result, {
     created: 1778037331,
     usage: { total_tokens: 2104 },
-    url: "https://r2.example/image.png"
+    b64_json: "data:image/png;base64,AQID"
   });
 });
 
-test("generateImage supports b64_json responses", async () => {
-  // 模拟返回 base64 data URL 的 APIYi 响应。
+test("generateImage adds a PNG data URL prefix to the APIYi base64 response", async () => {
+  // 模拟返回不带 data URL 前缀的纯 base64 APIYi 响应。
   const fakeFetch: typeof fetch = async () =>
     new Response(
       JSON.stringify({
-        data: [{ b64_json: "data:image/png;base64,abc" }]
+        data: [{ b64_json: "abc" }]
       }),
       { status: 200 }
     );
 
   const result = await generateImage({
     prompt: "1024x1024 方形 LOGO，极简猫咪线条",
-    responseFormat: "b64_json",
     apiKey: "sk-test",
     fetchImpl: fakeFetch
   });
@@ -94,7 +92,7 @@ test("generateImage reports missing expected image field", async () => {
 
   await assert.rejects(
     () => generateImage({ prompt: "test", apiKey: "sk-test", fetchImpl: fakeFetch }),
-    /APIYi response did not include url/
+    /APIYi response did not include b64_json/
   );
 });
 
@@ -112,7 +110,7 @@ test("editImage sends multipart APIYi request with image file and prompt", async
       JSON.stringify({
         created: 1778037331,
         usage: { total_tokens: 2104 },
-        data: [{ url: "https://r2.example/edited.png" }]
+        data: [{ b64_json: "BAUG" }]
       }),
       { status: 200, headers: { "content-type": "application/json" } }
     );
@@ -134,9 +132,9 @@ test("editImage sends multipart APIYi request with image file and prompt", async
     });
 
     const formData = calls[0].init?.body as FormData;
-    assert.equal(formData.get("model"), "gpt-image-2-all");
+    assert.equal(formData.get("model"), "gpt-image-2.6-sunburst");
     assert.equal(formData.get("prompt"), "把产品图改成白底电商主图");
-    assert.equal(formData.get("response_format"), "url");
+    assert.equal(formData.has("response_format"), false);
 
     const image = formData.get("image") as File;
     assert.equal(image.name, "source.png");
@@ -145,27 +143,26 @@ test("editImage sends multipart APIYi request with image file and prompt", async
     assert.deepEqual(result, {
       created: 1778037331,
       usage: { total_tokens: 2104 },
-      url: "https://r2.example/edited.png"
+      b64_json: "data:image/png;base64,BAUG"
     });
   } finally {
     await rm(tempDir, { recursive: true, force: true });
   }
 });
 
-test("editImage supports b64_json responses", async () => {
+test("editImage normalizes the APIYi base64 response", async () => {
   const tempDir = await mkdtemp(path.join(tmpdir(), "image-mcp-edit-"));
   const imagePath = path.join(tempDir, "source.jpg");
   await writeFile(imagePath, Buffer.from([1, 2, 3]));
 
   // 模拟 APIYi 返回 base64 图片内容。
   const fakeFetch: typeof fetch = async () =>
-    new Response(JSON.stringify({ data: [{ b64_json: "data:image/png;base64,AQID" }] }), { status: 200 });
+    new Response(JSON.stringify({ data: [{ b64_json: "AQID" }] }), { status: 200 });
 
   try {
     const result = await editImage({
       prompt: "换背景",
       imagePath,
-      responseFormat: "b64_json",
       apiKey: "sk-test",
       fetchImpl: fakeFetch
     });
@@ -188,7 +185,7 @@ test("editImage uploads additional reference images in prompt order", async () =
   const fakeFetch: typeof fetch = async (_input, init) => {
     requestBody = init?.body as FormData;
 
-    return new Response(JSON.stringify({ data: [{ url: "https://r2.example/cover.png" }] }), { status: 200 });
+    return new Response(JSON.stringify({ data: [{ b64_json: "AQID" }] }), { status: 200 });
   };
 
   try {

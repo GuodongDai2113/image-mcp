@@ -4,7 +4,7 @@ import { pathToFileURL } from "node:url";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { editImage, generateImage, type GenerateImageResult, type ResponseFormat } from "./apiyi.js";
+import { editImage, generateImage, type GenerateImageResult } from "./apiyi.js";
 import { buildArticleCoverPrompt, buildArticleIllustrationPrompt } from "./articlePrompts.js";
 import { saveGeneratedImage } from "./imageFile.js";
 import { generateIcons } from "./icons.js";
@@ -45,17 +45,15 @@ export function createImageMcpServer(): McpServer {
     GENERATE_IMAGE_TOOL_NAME,
     {
       title: "Generate Image",
-      description: "Generate one image from a text prompt using APIYi gpt-image-2-all.",
+      description: "Generate one image from a text prompt using APIYi gpt-image-2.6-flare.",
       inputSchema: {
-        prompt: z.string().min(1).describe("Image generation prompt. Include size, aspect ratio, and style requirements in the prompt."),
-        response_format: z.enum(["url", "b64_json"]).optional().describe("Image response format. Defaults to url.")
+        prompt: z.string().min(1).describe("Image generation prompt. Include size, aspect ratio, and style requirements in the prompt.")
       }
     },
-    async ({ prompt, response_format }) => {
+    async ({ prompt }) => {
       try {
         const result = await generateImage({
-          prompt,
-          responseFormat: response_format as ResponseFormat | undefined
+          prompt
         });
         const savedResult = await saveGeneratedImage({
           prompt,
@@ -88,19 +86,17 @@ export function createImageMcpServer(): McpServer {
     EDIT_IMAGE_TOOL_NAME,
     {
       title: "Edit Image",
-      description: "Upload one local image and generate a new image from a prompt using APIYi gpt-image-2-all.",
+      description: "Upload one local image and generate a new image from a prompt using APIYi gpt-image-2.6-sunburst.",
       inputSchema: {
         prompt: z.string().min(1).describe("Image editing prompt describing how to generate a new image from the uploaded image."),
-        image_path: z.string().min(1).describe("Local image path to upload to APIYi."),
-        response_format: z.enum(["url", "b64_json"]).optional().describe("Image response format. Defaults to url.")
+        image_path: z.string().min(1).describe("Local image path to upload to APIYi.")
       }
     },
-    async ({ prompt, image_path, response_format }) => {
+    async ({ prompt, image_path }) => {
       try {
         const result = await editImage({
           prompt,
-          imagePath: image_path,
-          responseFormat: response_format as ResponseFormat | undefined
+          imagePath: image_path
         });
         const savedResult = await saveGeneratedImage({
           prompt,
@@ -138,11 +134,10 @@ export function createImageMcpServer(): McpServer {
         title: z.string().min(1).describe("Article title used for the cover theme and saved filename."),
         product_image_path: z.string().trim().min(1).optional().describe("Optional local product image path. The product is preserved as the main visual subject when provided."),
         logo_image_path: z.string().trim().min(1).optional().describe("Optional local logo image path. The logo is preserved and placed as a subtle brand mark."),
-        summary: z.string().optional().describe("Article summary, audience, or background context."),
-        response_format: z.enum(["url", "b64_json"]).optional().describe("Image response format. Defaults to url.")
+        summary: z.string().optional().describe("Article summary, audience, or background context.")
       }
     },
-    async ({ title, product_image_path, logo_image_path, summary, response_format }) => {
+    async ({ title, product_image_path, logo_image_path, summary }) => {
       try {
         const usesProductImage = product_image_path !== undefined;
         const usesLogoImage = logo_image_path !== undefined;
@@ -155,8 +150,7 @@ export function createImageMcpServer(): McpServer {
         const result = await generateArticleImage({
           prompt,
           productImagePath: product_image_path,
-          logoImagePath: logo_image_path,
-          responseFormat: response_format as ResponseFormat | undefined
+          logoImagePath: logo_image_path
         });
         const savedResult = await saveGeneratedImage({
           prompt: title,
@@ -194,11 +188,10 @@ export function createImageMcpServer(): McpServer {
         topic: z.string().min(1).describe("Article illustration topic used for image content and the saved filename."),
         section_context: z.string().optional().describe("Article section context used to align the illustration with the body text."),
         product_image_path: z.string().trim().min(1).optional().describe("Optional local product image path. The product is preserved as the main visual subject when provided."),
-        logo_image_path: z.string().trim().min(1).optional().describe("Optional local logo image path. The logo is preserved and placed as a subtle brand mark."),
-        response_format: z.enum(["url", "b64_json"]).optional().describe("Image response format. Defaults to url.")
+        logo_image_path: z.string().trim().min(1).optional().describe("Optional local logo image path. The logo is preserved and placed as a subtle brand mark.")
       }
     },
-    async ({ topic, section_context, product_image_path, logo_image_path, response_format }) => {
+    async ({ topic, section_context, product_image_path, logo_image_path }) => {
       try {
         const usesProductImage = product_image_path !== undefined;
         const usesLogoImage = logo_image_path !== undefined;
@@ -211,8 +204,7 @@ export function createImageMcpServer(): McpServer {
         const result = await generateArticleImage({
           prompt,
           productImagePath: product_image_path,
-          logoImagePath: logo_image_path,
-          responseFormat: response_format as ResponseFormat | undefined
+          logoImagePath: logo_image_path
         });
         const savedResult = await saveGeneratedImage({
           prompt: topic,
@@ -252,15 +244,13 @@ export function createImageMcpServer(): McpServer {
         /** 按最终输出顺序提供每个图标的描述。 */
         descriptions: z.array(z.string().trim().min(1)).min(1).max(36).describe("One description per icon, in output order."),
         /** 为整组图标指定统一视觉风格。 */
-        style: z.string().trim().min(1).optional().describe("Shared visual style. Defaults to clean, minimal flat icons. A transparent PNG background is always requested."),
-        /** 选择原始网格图的接口响应格式。 */
-        response_format: z.enum(["url", "b64_json"]).optional().describe("API image response format. Defaults to url. Cropped icons are always PNG.")
+        style: z.string().trim().min(1).optional().describe("Shared visual style. Defaults to clean, minimal flat icons. A transparent PNG background is always requested.")
       }
     },
     /** 生成网格并裁切图标，将失败原因作为 MCP 工具错误返回。 */
-    async ({ count, descriptions, style, response_format }) => {
+    async ({ count, descriptions, style }) => {
       try {
-        const result = await generateIcons({ count, descriptions, style, responseFormat: response_format });
+        const result = await generateIcons({ count, descriptions, style });
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (error) {
         return { isError: true, content: [{ type: "text", text: getErrorMessage(error) }] };
@@ -296,11 +286,6 @@ async function generateArticleImage(options: {
    * 可选 Logo 图片路径；存在产品图时作为第二张参考图，否则作为第一张参考图。
    */
   logoImagePath?: string;
-
-  /**
-   * APIYi 返回图片时使用的响应格式。
-   */
-  responseFormat?: ResponseFormat;
 }): Promise<GenerateImageResult> {
   const imagePaths: string[] = [];
 
@@ -314,16 +299,14 @@ async function generateArticleImage(options: {
 
   if (imagePaths.length === 0) {
     return generateImage({
-      prompt: options.prompt,
-      responseFormat: options.responseFormat
+      prompt: options.prompt
     });
   }
 
   return editImage({
     prompt: options.prompt,
     imagePath: imagePaths[0],
-    additionalImagePaths: imagePaths.length > 1 ? imagePaths.slice(1) : undefined,
-    responseFormat: options.responseFormat
+    additionalImagePaths: imagePaths.length > 1 ? imagePaths.slice(1) : undefined
   });
 }
 

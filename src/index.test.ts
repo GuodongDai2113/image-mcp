@@ -87,7 +87,7 @@ test("createImageMcpServer registers the generate_image MCP tool", async () => {
     const imageTool = tools.tools.find((tool) => tool.name === GENERATE_IMAGE_TOOL_NAME);
 
     assert.ok(imageTool);
-    assert.equal(imageTool.description, "Generate one image from a text prompt using APIYi gpt-image-2-all.");
+    assert.equal(imageTool.description, "Generate one image from a text prompt using APIYi gpt-image-2.6-flare.");
     assert.deepEqual(imageTool.inputSchema.required, ["prompt"]);
   } finally {
     await Promise.all([client.close(), server.close()]);
@@ -106,7 +106,7 @@ test("createImageMcpServer registers the edit_image MCP tool", async () => {
     const imageTool = tools.tools.find((tool) => tool.name === EDIT_IMAGE_TOOL_NAME);
 
     assert.ok(imageTool);
-    assert.equal(imageTool.description, "Upload one local image and generate a new image from a prompt using APIYi gpt-image-2-all.");
+    assert.equal(imageTool.description, "Upload one local image and generate a new image from a prompt using APIYi gpt-image-2.6-sunburst.");
     assert.deepEqual(imageTool.inputSchema.required, ["prompt", "image_path"]);
   } finally {
     await Promise.all([client.close(), server.close()]);

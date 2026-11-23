@@ -1,9 +1,8 @@
 import { mkdir, mkdtemp } from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import sharp from "sharp";
-import { generateImage, type GenerateImageOptions } from "./apiyi.js";
-import { saveGeneratedImage, sanitizePromptForFilename } from "./imageFile.js";
+import { generateImage } from "./apiyi.js";
+import { resolveDefaultImageDir, saveGeneratedImage, sanitizePromptForFilename } from "./imageFile.js";
 
 /** 批量图标生成参数，数量必须与按顺序排列的描述完全一致。 */
 export interface GenerateIconsOptions {
@@ -13,9 +12,7 @@ export interface GenerateIconsOptions {
   descriptions: string[];
   /** 所有图标共同使用的视觉风格。 */
   style?: string;
-  /** API 响应格式，不改变最终图标的 PNG 格式。 */
-  responseFormat?: GenerateImageOptions["responseFormat"];
-  /** 可选保存根目录，默认使用当前用户的图片目录。 */
+  /** 可选保存根目录；默认优先使用项目中的 .agents/images，不存在 .agents 时使用 images。 */
   picturesDir?: string;
   /** 可注入的生成函数，供测试隔离真实付费请求。 */
   generateImpl?: typeof generateImage;
@@ -130,8 +127,8 @@ export async function cropIconGrid(gridPath: string, descriptions: string[], out
 /** 仅生成一张网格图，保存到独立批次目录后裁切并返回所有图标及原图路径。 */
 export async function generateIcons(options: GenerateIconsOptions) {
   const prompt = buildIconsPrompt(options);
-  const result = await (options.generateImpl ?? generateImage)({ prompt, responseFormat: options.responseFormat });
-  const root = path.resolve(options.picturesDir ?? path.join(os.homedir(), "Pictures"));
+  const result = await (options.generateImpl ?? generateImage)({ prompt });
+  const root = path.resolve(options.picturesDir ?? await resolveDefaultImageDir());
   await mkdir(root, { recursive: true });
   const outputDir = await mkdtemp(path.join(root, "icons-"));
   const grid = await saveGeneratedImage({ prompt: "grid", result, picturesDir: outputDir, fetchImpl: options.fetchImpl });

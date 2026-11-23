@@ -3,12 +3,8 @@ import path from "node:path";
 
 const APIYI_IMAGE_GENERATION_URL = "https://api.apiyi.com/v1/images/generations";
 const APIYI_IMAGE_EDIT_URL = "https://api.apiyi.com/v1/images/edits";
-const APIYI_IMAGE_MODEL = "gpt-image-2-all";
-
-/**
- * APIYi 图片生成接口支持的响应格式。
- */
-export type ResponseFormat = "url" | "b64_json";
+const APIYI_IMAGE_GENERATION_MODEL = "gpt-image-2.6-flare";
+const APIYI_IMAGE_EDIT_MODEL = "gpt-image-2.6-sunburst";
 
 /**
  * 调用 APIYi 文生图接口时使用的选项。
@@ -18,11 +14,6 @@ export interface GenerateImageOptions {
    * 用户输入的图片生成提示词，尺寸、比例和风格也应写在这里。
    */
   prompt: string;
-
-  /**
-   * 图片响应格式；默认使用 url，避免 MCP 返回体过大。
-   */
-  responseFormat?: ResponseFormat;
 
   /**
    * APIYi API Key；未传入时会读取环境变量 APIYI_API_KEY。
@@ -55,11 +46,6 @@ export interface EditImageOptions {
   additionalImagePaths?: readonly string[];
 
   /**
-   * 图片响应格式；默认使用 url，避免 MCP 返回体过大。
-   */
-  responseFormat?: ResponseFormat;
-
-  /**
    * APIYi API Key；未传入时会读取环境变量 APIYI_API_KEY。
    */
   apiKey?: string;
@@ -85,12 +71,12 @@ export interface GenerateImageResult {
   usage?: unknown;
 
   /**
-   * response_format 为 url 时返回的图片链接。
+   * 兼容旧调用结果的图片链接；GPT-Image 2.6 官转接口不会返回此字段。
    */
   url?: string;
 
   /**
-   * response_format 为 b64_json 时返回的 base64 data URL。
+   * APIYi 返回的 base64 图片数据；标准化后始终包含 data URL 前缀。
    */
   b64_json?: string;
 }
@@ -101,12 +87,12 @@ interface ApiyiResponseBody {
    */
   data?: Array<{
     /**
-     * response_format 为 url 时返回的图片链接。
+     * 兼容旧接口响应的图片链接。
      */
     url?: unknown;
 
     /**
-     * response_format 为 b64_json 时返回的 base64 data URL。
+     * APIYi 返回的纯 base64 图片数据。
      */
     b64_json?: unknown;
   }>;
@@ -128,10 +114,9 @@ interface ApiyiResponseBody {
 }
 
 /**
- * 根据提示词调用 APIYi gpt-image-2-all 文生图接口，并返回标准化图片结果。
+ * 根据提示词调用 APIYi GPT-Image 2.6 Flare 文生图接口，并返回标准化图片结果。
  */
 export async function generateImage(options: GenerateImageOptions): Promise<GenerateImageResult> {
-  const responseFormat = options.responseFormat ?? "url";
   const apiKey = resolveApiKey(options.apiKey);
   const fetchImpl = options.fetchImpl ?? fetch;
 
@@ -142,9 +127,8 @@ export async function generateImage(options: GenerateImageOptions): Promise<Gene
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      model: APIYI_IMAGE_MODEL,
-      prompt: options.prompt,
-      response_format: responseFormat
+      model: APIYI_IMAGE_GENERATION_MODEL,
+      prompt: options.prompt
     })
   });
 
@@ -154,18 +138,17 @@ export async function generateImage(options: GenerateImageOptions): Promise<Gene
     throw new Error(`APIYi request failed with status ${response.status}: ${summarizeApiError(body)}`);
   }
 
-  return normalizeImageResult(body, responseFormat);
+  return normalizeImageResult(body);
 }
 
 /**
- * 上传本地图片并根据提示词调用 APIYi gpt-image-2-all 图片编辑接口。
+ * 上传本地图片并根据提示词调用 APIYi GPT-Image 2.6 Sunburst 图片编辑接口。
  */
 export async function editImage(options: EditImageOptions): Promise<GenerateImageResult> {
-  const responseFormat = options.responseFormat ?? "url";
   const apiKey = resolveApiKey(options.apiKey);
   const fetchImpl = options.fetchImpl ?? fetch;
   const imagePaths = [options.imagePath, ...(options.additionalImagePaths ?? [])];
-  const formData = await createEditImageFormData(imagePaths, options.prompt, responseFormat);
+  const formData = await createEditImageFormData(imagePaths, options.prompt);
 
   const response = await fetchImpl(APIYI_IMAGE_EDIT_URL, {
     method: "POST",
@@ -181,7 +164,7 @@ export async function editImage(options: EditImageOptions): Promise<GenerateImag
     throw new Error(`APIYi request failed with status ${response.status}: ${summarizeApiError(body)}`);
   }
 
-  return normalizeImageResult(body, responseFormat);
+  return normalizeImageResult(body);
 }
 
 /**
@@ -189,14 +172,12 @@ export async function editImage(options: EditImageOptions): Promise<GenerateImag
  */
 async function createEditImageFormData(
   imagePaths: readonly string[],
-  prompt: string,
-  responseFormat: ResponseFormat
+  prompt: string
 ): Promise<FormData> {
   const formData = new FormData();
 
-  formData.append("model", APIYI_IMAGE_MODEL);
+  formData.append("model", APIYI_IMAGE_EDIT_MODEL);
   formData.append("prompt", prompt);
-  formData.append("response_format", responseFormat);
 
   for (const imagePath of imagePaths) {
     const imageBuffer = await readImageFile(imagePath);
@@ -269,20 +250,8 @@ async function parseJsonBody(response: Response): Promise<ApiyiResponseBody> {
 /**
  * 将 APIYi 的原始响应转换为 MCP 工具使用的稳定结果结构。
  */
-function normalizeImageResult(body: ApiyiResponseBody, responseFormat: ResponseFormat): GenerateImageResult {
+function normalizeImageResult(body: ApiyiResponseBody): GenerateImageResult {
   const firstImage = body.data?.[0];
-
-  if (responseFormat === "url") {
-    if (typeof firstImage?.url !== "string") {
-      throw new Error("APIYi response did not include url");
-    }
-
-    return removeUndefinedProperties({
-      created: typeof body.created === "number" ? body.created : undefined,
-      usage: body.usage,
-      url: firstImage.url
-    });
-  }
 
   if (typeof firstImage?.b64_json !== "string") {
     throw new Error("APIYi response did not include b64_json");
@@ -291,7 +260,7 @@ function normalizeImageResult(body: ApiyiResponseBody, responseFormat: ResponseF
   return removeUndefinedProperties({
     created: typeof body.created === "number" ? body.created : undefined,
     usage: body.usage,
-    b64_json: firstImage.b64_json
+    b64_json: `data:image/png;base64,${firstImage.b64_json}`
   });
 }
 
